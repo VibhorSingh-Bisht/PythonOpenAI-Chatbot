@@ -108,7 +108,7 @@ async def main():
             # Set the starting position of the cell
             pdf.set_x(10)
             pdf.multi_cell(180, 10, paragraph)  # Specify width for the cell
-    output_path = "C:\\Users\\vibho\\Documents\\Pro\\JOB\\PythonAgentAI-main\\data\\canoo_data.pdf"
+    output_path = f"{os.getcwd()}\\data\\canoo_data.pdf"
     pdf.output(output_path)
 
 asyncio.run(main())
