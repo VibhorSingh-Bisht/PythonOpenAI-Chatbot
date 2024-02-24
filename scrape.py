@@ -1,10 +1,11 @@
-#scrape.py
+#Scrape.py
 import asyncio
-from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
 import logging
-from fpdf import FPDF
 import re
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from fpdf import FPDF
+import os
 
 logging.basicConfig(level=logging.INFO)
 
@@ -43,30 +44,37 @@ async def scrape_page(url, tags, header):
     Scrape content from a given URL based on provided tags and prepend a header.
     """
     logging.info(f"Scraping {url}...")
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        try:
-            page = await browser.new_page()
-            await page.goto(url)
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    #options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    options.add_argument('log-level=3')
+    browser = webdriver.Chrome(options=options)
+    
+    try:
+        browser.get(url)
+        page_source = browser.page_source
 
-            page_source = await page.content()
+        cleaned_content = await remove_unwanted_tags(page_source)
+        extracted_content = await extract_tags(cleaned_content, tags, header)
 
-            cleaned_content = await remove_unwanted_tags(page_source)
-            extracted_content = await extract_tags(cleaned_content, tags, header)
-
-            logging.info(f"Content scraped from {url}")
-            return extracted_content
-        except Exception as e:
-            logging.error(f"Error occurred while scraping {url}: {e}")
-            return f"Error: {e}"
-        finally:
-            await browser.close()
+        logging.info(f"Content scraped from {url}")
+        return extracted_content
+    except Exception as e:
+        logging.error(f"Error occurred while scraping {url}: {e}")
+        return f"Error: {e}"
+    finally:
+        browser.quit()
 
 async def search_urls(urls_and_tags, headers):
     """
     Scrape content from multiple URLs based on provided tags concurrently and prepend specific headers.
     """
-    tasks = [scrape_page(url, tags, header) for (url, tags), header in zip(urls_and_tags, headers)]
+    tasks = []
+    for i in range(len(urls_and_tags)):
+        url, tags = urls_and_tags[i]
+        header = headers[i]
+        tasks.append(scrape_page(url, tags, header))
     return await asyncio.gather(*tasks)
 
 async def main():
@@ -108,7 +116,7 @@ async def main():
             # Set the starting position of the cell
             pdf.set_x(10)
             pdf.multi_cell(180, 10, paragraph)  # Specify width for the cell
-    output_path = f"{os.getcwd()}\\data\\canoo_data.pdf"
+    output_path = f"{os.getcwd()}\\data\\Canoo_data.pdf"
     pdf.output(output_path)
 
 asyncio.run(main())
