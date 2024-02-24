@@ -37,7 +37,7 @@ async def extract_tags(html_content, tags, header):
             text_with_header = f"{header}: {text}"
             text_parts.append(text_with_header)
 
-    return ' '.join(text_parts)
+    return '\n'.join(text_parts)
 
 async def scrape_page(url, tags, header):
     """
