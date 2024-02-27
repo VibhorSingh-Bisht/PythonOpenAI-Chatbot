@@ -1,4 +1,3 @@
-#Scrape.py
 import asyncio
 import logging
 import re
@@ -6,8 +5,34 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from fpdf import FPDF
 import os
+import pandas as pd
 
 logging.basicConfig(level=logging.INFO)
+
+async def scrape_specific(url):
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    options.add_argument('log-level=3')
+    driver = webdriver.Chrome(options)
+    
+    try:
+        driver.get(url)
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source,"html.parser")
+        
+        tables = soup.find_all("table")
+        data = []
+        for table in tables:
+            rows = table.find_all("tr")
+            for row in rows:
+                cells = row.find_all("td")
+                row_data = [cell.get_text(strip=True) for cell in cells]
+                data.append(row_data)
+        
+    finally:
+        driver.quit()
+        return data
 
 async def remove_unwanted_tags(html_content, unwanted_tags=["script", "style"]):
     """
@@ -37,7 +62,7 @@ async def extract_tags(html_content, tags, header):
             text_with_header = f"{header}: {text}"
             text_parts.append(text_with_header)
 
-    return '\n'.join(text_parts)
+    return ' '.join(text_parts)
 
 async def scrape_page(url, tags, header):
     """
@@ -70,11 +95,7 @@ async def search_urls(urls_and_tags, headers):
     """
     Scrape content from multiple URLs based on provided tags concurrently and prepend specific headers.
     """
-    tasks = []
-    for i in range(len(urls_and_tags)):
-        url, tags = urls_and_tags[i]
-        header = headers[i]
-        tasks.append(scrape_page(url, tags, header))
+    tasks = [scrape_page(url, tags, header) for (url, tags), header in zip(urls_and_tags, headers)]
     return await asyncio.gather(*tasks)
 
 async def main():
@@ -84,19 +105,15 @@ async def main():
     urls_and_tags = [
         ("https://investors.canoo.com/corporate-governance/board-of-directors", ["h1", "h2", "p", "div"]),
         ("https://www.press.canoo.com/", ["h1", "h2", "p", "div"]),
-        ("https://www.wsj.com/market-data/quotes/GOEV", ["h1", "h2", "div", "span", "div"]),
         ("https://www.barrons.com/market-data/stocks/goev/company-people?amp%3Biso=XNAS&mod=quotes", ["div", "span"]),
         ("https://www.marketbeat.com/stocks/NYSE/GOEV/profile/", ["h1", "p"]),
         ("https://tracxn.com/d/companies/canoo/__HfVDFR8zT4sJ0XU0CVBHJ1P1CTyblbW8viNKwk579vE/competitors", ["h2", "ul", "p"]),
-        ("https://sg.finance.yahoo.com/quote/GOEV/key-statistics/", ["h1", "p", "td"]),
         ("https://www.pwc.com/gx/en/industries/automotive/publications/eascy.html", ["h2", "p", "li"])
     ]
 
     headers = [
         "Key Players of Canoo",
         "Canoo Info",
-        "Canoo Shares Data",
-        "Canoo Stocks Data",
         "Canoo Stocks Price, News, and Analysis",
         "Canoo Competitors",
         "Canoo Statistics",
@@ -116,7 +133,16 @@ async def main():
             # Set the starting position of the cell
             pdf.set_x(10)
             pdf.multi_cell(180, 10, paragraph)  # Specify width for the cell
-    output_path = f"{os.getcwd()}\\data\\Canoo_data.pdf"
+    output_path = f"{os.getcwd()}\\data\\canoo_data.pdf"
     pdf.output(output_path)
+    specific_urls = ["https://finance.yahoo.com/quote/GOEV?.tsrc=fin-srch","https://finance.yahoo.com/quote/GOEV/key-statistics"]
+    tables_data = await asyncio.gather(*[scrape_specific(url) for url in specific_urls])
+
+    df = pd.DataFrame(columns = ["Content","Value"])
+    for first in tables_data:
+        for row in first:
+            length = len(df)
+            df.loc[length] = row
+    df.to_csv(f"{os.getcwd()}\\data\\canoo.csv",index=False)
 
 asyncio.run(main())
