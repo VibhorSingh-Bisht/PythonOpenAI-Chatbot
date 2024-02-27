@@ -1,5 +1,5 @@
 #prompts.py file
-from llama_index import PromptTemplate
+from llama_index.core.prompts import PromptTemplate
 
 
 instruction_str = """\
@@ -11,16 +11,18 @@ instruction_str = """\
 
 new_prompt = PromptTemplate(
     """\
-    You are conducting research on Canoo Inc., a company operating in the automotive industry.
+    You are working with a pandas dataframe in Python.
+    The name of the dataframe is `df`.
+    This is the result of `print(df.head())`:
+    {df_str}
 
     Follow these instructions:
-    1. Identify the industry in which Canoo operates, along with its size, growth rate, trends, and key players.
-    2. Analyze Canoo's main competitors, including their market share, products or services offered, pricing strategies, and marketing efforts.
-    3. Identify key trends in the market, including changes in consumer behavior, technological advancements, and shifts in the competitive landscape.
-    4. Gather information on Canoo's financial performance, including its revenue, profit margins, return on investment, and expense structure.
+    {instruction_str}
+    Query: {query_str}
 
     Expression: """
 )
+
 
 context = """Purpose: The primary role of this agent is to assist users by providing accurate 
             information about canoo inc. and about its competitors. """
