@@ -19,7 +19,7 @@ async def scrape_specific(url):
     try:
         driver.get(url)
         page_source = driver.page_source
-        soup = BeautifulSoup(page_source,"html.parser")
+        soup = BeautifulSoup(page_source, "html.parser")
         
         tables = soup.find_all("table")
         data = []
@@ -58,11 +58,14 @@ async def extract_tags(html_content, tags, header):
         for element in elements:
             # Remove special characters using regex
             text = re.sub(r'[^\x00-\x7F]+', '', element.get_text())
-            # Prepend header to text
-            text_with_header = f"{header}: {text}"
-            text_parts.append(text_with_header)
+            # Append header only once at the beginning of text_parts
+            if not text_parts:
+                text_parts.append(f"{header}:")
+            # Append text if it's not empty
+            if text.strip():
+                text_parts.append(text)
 
-    return ' '.join(text_parts)
+    return '\n'.join(text_parts)
 
 async def scrape_page(url, tags, header):
     """
@@ -71,8 +74,6 @@ async def scrape_page(url, tags, header):
     logging.info(f"Scraping {url}...")
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
-    #options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36")
-    options.add_experimental_option('excludeSwitches', ['enable-logging'])
     options.add_argument('log-level=3')
     browser = webdriver.Chrome(options=options)
     
@@ -126,23 +127,23 @@ async def main():
     pdf.set_auto_page_break(auto=True, margin=10)
     pdf.add_page()
     pdf.set_font('Arial', '', 16)  # Change font to Arial
+    
     for text_with_header in results:
-        paragraphs = text_with_header.split("\n")  # Split text into paragraphs
+        if text_with_header.strip():  # Check if text is not empty
+            paragraphs = text_with_header.split("\n")  # Split text into paragraphs
+            for paragraph in paragraphs:
+                if paragraph.strip():  # Check if paragraph is not empty
+                    # Set the starting position of the cell
+                    pdf.set_x(10)
+                    pdf.multi_cell(180, 10, paragraph)  # Specify width for the cell
 
-        for paragraph in paragraphs:
-            # Set the starting position of the cell
-            pdf.set_x(10)
-            pdf.multi_cell(180, 10, paragraph)  # Specify width for the cell
-    output_path = f"{os.getcwd()}\\data\\canoo_data.pdf"
+    output_path = os.path.join(os.getcwd(), "data", "canoo_data.pdf")
     pdf.output(output_path)
+
     specific_urls = ["https://finance.yahoo.com/quote/GOEV?.tsrc=fin-srch","https://finance.yahoo.com/quote/GOEV/key-statistics"]
     tables_data = await asyncio.gather(*[scrape_specific(url) for url in specific_urls])
 
-    df = pd.DataFrame(columns = ["Content","Value"])
-    for first in tables_data:
-        for row in first:
-            length = len(df)
-            df.loc[length] = row
-    df.to_csv(f"{os.getcwd()}\\data\\canoo.csv",index=False)
+    df = pd.DataFrame(sum(tables_data, []), columns=["Content", "Value"])
+    df.to_csv(os.path.join(os.getcwd(), "data", "canoo.csv"), index=False)
 
 asyncio.run(main())
